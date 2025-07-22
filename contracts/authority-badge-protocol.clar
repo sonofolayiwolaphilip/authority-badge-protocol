@@ -526,3 +526,67 @@
   )
 )
 
+;; ===== Configuration Management =====
+
+;; Update rate limiting parameters (administrator only)
+(define-public (configure-rate-limiting (new-window uint) (new-max-operations uint))
+  (begin
+    ;; Administrator authorization required for configuration changes
+    (asserts! (is-eq tx-sender system-administrator) error-insufficient-privileges)
+    (asserts! (> new-window u0) error-badge-value-out-of-range)
+    (asserts! (> new-max-operations u0) error-badge-value-out-of-range)
+
+    ;; Apply new rate limiting configuration
+    (var-set permission-grant-window new-window)
+    (var-set maximum-operations-per-window new-max-operations)
+    (ok true)
+  )
+)
+
+;; Adjust security delay for time-locked operations (administrator only)
+(define-public (adjust-security-delay (new-delay-blocks uint))
+  (begin
+    ;; System administrator privilege verification
+    (asserts! (is-eq tx-sender system-administrator) error-insufficient-privileges)
+    (asserts! (> new-delay-blocks u0) error-badge-value-out-of-range)
+
+    ;; Update security delay configuration
+    (var-set safety-lockout-duration new-delay-blocks)
+    (ok true)
+  )
+)
+
+;; ===== System Status and Monitoring =====
+
+;; Retrieve current system operational status
+(define-read-only (get-system-status)
+  {
+    emergency-active: (var-get emergency-lockdown-active),
+    lockdown-reason: (var-get lockdown-justification),
+    total-badges-created: (var-get next-badge-identifier),
+    pending-operations: (var-get pending-task-counter),
+    rate-limit-window: (var-get permission-grant-window),
+    max-operations-per-window: (var-get maximum-operations-per-window),
+    security-delay: (var-get safety-lockout-duration)
+  }
+)
+
+;; Retrieve complete badge information by identifier
+(define-read-only (get-badge-details (badge-id uint))
+  (map-get? badge-information-vault { badge-identifier: badge-id })
+)
+
+;; Check user authorization level for specific badge
+(define-read-only (check-user-authorization (badge-id uint) (user principal))
+  (map-get? tiered-authorization-registry { badge-identifier: badge-id, authorized-party: user })
+)
+
+;; Retrieve cryptographic signature information for badge
+(define-read-only (get-badge-signature-info (badge-id uint))
+  (map-get? badge-security-signatures { badge-identifier: badge-id })
+)
+
+;; Get pending operation details by task identifier
+(define-read-only (get-pending-operation-info (task-id uint) (badge-id uint))
+  (map-get? delayed-operation-queue { task-identifier: task-id, badge-identifier: badge-id })
+)
